@@ -125,9 +125,9 @@ share one. The commit history must agree with this table.
 
 | Subsystem | Owner |
 |---|---|
-| Buffering and lines (`lines.asm`) | |
-| Matching (`match.asm`) | |
-| Formatting and flags (`fmt.asm`, `args.asm`, the tests you add) | |
+| Buffering and lines (`lines.asm`) | Cambel |
+| Matching (`match.asm`) | Carreon |
+| Formatting and flags (`fmt.asm`, `args.asm`, the tests you add) | De Guzman, Kaindoy |
 
 ## Quirks and Issues
 
