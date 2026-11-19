@@ -48,12 +48,20 @@
   section .note.GNU-stack noalloc noexec nowrite progbits
 %endif
 
+segment .data
+        flag_table db 'n', 'c', 'v', 'i', 'w'     ; bit 0 to bit 4
+        FLAG_COUNT equ 5
+
 segment .text
         global  _parse_args
 
 _parse_args:
-        enter   0,0
-        pusha
+        ; preserve callee-saved registers
+        push    ebp
+        mov     ebp, esp
+        push    ebx
+        push    esi
+        push    edi
 
         ;
         ; TODO: parse.
@@ -77,7 +85,82 @@ _parse_args:
         ; the hit as well. Work the index out from that before you shift.
         ;
 
-        popa
-        mov     eax, -1
-        leave
+        cld                             ; make scan advance forward
+        mov     ebx, [ebp+16]           ; ebx = *out
+
+        ;initialize all three 4-byte fields
+        mov     dword [ebx], 0          ; out->flags
+        mov     dword [ebx+4], 0        ; out->pattern
+        mov     dword [ebx+8], 0        ; out->path
+
+        mov     edx, 1  ;the argv index
+
+.walk_args:
+        cmp     edx, [ebp+8]            ; compare current argv index w/ total num of args
+        jge     .finish
+        mov     eax, [ebp+12]           ; load current arg
+        mov     esi, [eax+edx*4]        ; check first char
+        inc     edx
+
+        cmp     byte [esi], '-'         ; compare 1st char with '-'
+        jne     .positional
+        cmp     byte [esi+1], 0         ; compare 2nd char with NUL ('\0')
+        je      .positional
+        inc     esi                     ; go to next char
+
+.scanning_shifting:
+        movzx     eax, byte [esi]       ; if extended ASCII char is passed, zero-extend
+        cmp       eax, 0
+        je        .walk_args            ; if '\0' current argv token is fully parsed
+        inc       esi                   ;next character
+        mov       edi, flag_table       ; edi points to start of flag table
+        mov       ecx, FLAG_COUNT       ; search until at most 5 chars
+        repne     scasb
+        jne       .unknown_flag
+
+        mov     eax, FLAG_COUNT - 1
+        sub     eax, ecx                ; eax = 4 - ecx
+        mov     ecx, eax                ; (holds the exact index 0-4)
+
+        ; turn this flag's bit inside out->flags
+        mov     eax, 1
+        shl     eax, cl                 ; move bit to right flag position
+        or      [ebx], eax              ; combine with current flipped bits
+
+        jmp     .scanning_shifting
+
+.unknown_flag:
+        jmp     .done                   ; eax still holds the unknown char
+
+
+.positional:
+        cmp     dword [ebx+4], 0        ; if any positional exists
+        jnz     .try_path
+        mov     [ebx+4], esi            ; store  to out->pattern
+        jmp     .walk_args
+
+.try_path:
+        cmp     dword [ebx+8], 0        ; if only one positional word was given (no path)
+        jnz     .usage_error            ; extra positional, since two are already given
+        mov     [ebx+8], esi            ; store to out->path
+        jmp     .walk_args              ; next arg
+
+.finish:
+        cmp     dword [ebx+4], 0        ; check if pattern exists
+        je      .usage_error            ; no pattern
+        cmp     dword [ebx+8], 0        ; check if path exists
+        je      .usage_error            ;
+
+        mov     eax, 0                  ; no errors
+        jmp     .done
+
+.usage_error:
+        mov     eax, -1                 ; errors
+
+
+.done:
+        pop     edi                     ; LIFO
+        pop     esi
+        pop     ebx
+        pop     ebp
         ret
