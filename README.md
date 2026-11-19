@@ -1,7 +1,7 @@
 <!--no-pdf-->
 # CMSC 131 Lab 3 Starter
 
-[![lab3-checks](https://github.com/WhiteLicorice/cmsc-131-lab3-starter/actions/workflows/test.yml/badge.svg)](https://github.com/WhiteLicorice/cmsc-131-lab3-starter/actions/workflows/test.yml)
+[![lab3-checks](https://github.com/longg-anisa/cmsc-131-lab3-starter/actions/workflows/test.yml/badge.svg)](https://github.com/longg-anisa/cmsc-131-lab3-starter/actions/workflows/test.yml)
 
 A grep clone whose correctness is agreement with `grep` itself, byte for byte. The manual is the assignment. This file is the repository's own notes.
 
@@ -98,7 +98,6 @@ agreement with it means for a line that matches inside a longer word.
 - `rengrep` must produce byte-identical output for the same arguments.
 - Agreement means a line like `concatenate` is printed for pattern `cat`, because the pattern is a literal substring. Only `-w` excludes it.
 
-
 ### Solution architecture
 
 How the four routines split the work. How the line index is built from
@@ -112,10 +111,10 @@ who owns it.
 
 | Week | Goal | Owner |
 |---|---|---|
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| 4 | Defense | |
+| 1 | Complete Design Notes and Subsystem Ownership; Build working prototype (`args.asm`, `lines.asm`). | Carreon, Kaindoy;  Cambel, De Guzman |
+| 2 | Implement `match.asm` and `fmt.asm`. | Carreon, Kaindoy |
+| 3 | Set up additional tests; Document issues and quirks and debugging (if any). | Kaindoy; All members |
+| 4 | Defense | All members |
 
 ## Subsystem Ownership
 
