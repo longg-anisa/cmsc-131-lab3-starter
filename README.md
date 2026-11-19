@@ -104,6 +104,60 @@ How the four routines split the work. How the line index is built from
 one buffer, how the flag table dispatches, and which registers each
 routine uses.
 
+__Routine Implementations (C boundary in `driver.c`):__
+```
+// lines.asm
+int PRE_CDECL index_lines(char *buf, int len, struct line *out, int max) POST_CDECL;
+
+// match.asm
+int PRE_CDECL line_matches(char *line, int linelen,
+                           char *pat, int patlen,
+                           int fold, int whole) POST_CDECL;
+// fmt.asm
+int PRE_CDECL int_to_dec(int n, char *out) POST_CDECL;
+
+// args.asm
+int PRE_CDECL parse_args(int argc, char **argv, struct args *out) POST_CDECL;
+```
+<br>
+
+__How the four routines split the work__
+| File | Routine | Purpose |
+|---|---|---|
+| `args.asm` | `parse_args` | First to be built. Parses the command line `argv` to a flag set, pattern, and a file name. Returns `0` on success, `-1` on a usage error when the pattern or path is missing or a third positional appears, and the unknown flag character as a positive int when a flag isn’t in the table. Fills the `struct args`, and the C driver uses `path` in `read_file` to get the `buf` passed to `index_lines`. |
+| `lines.asm` | `index_lines` | Scans the `buf` from `read_file` and builds an index of line starts and lengths. Fills one `struct line` per line, in file order, and stops at max entries, and returns the number of lines. |
+| `match.asm` | `line_matches` | Gets the line and its lengths from the `index_lines` entry, and the pattern from `parse_args` with its length, along with fold (`-i`) and whole (`-w`) as flags. Returns `1` if `pat` occurs in the line, `0` otherwise. A nonzero fold means the program must search for the pattern in the line case-insensitively, while a nonzero whole means it requires a whole-word match. |
+| `fmt.asm` | `int_to_dec` | Write the decimal text of n into out. Return the byte count. No leading zeros (except n == 0, which is “0” as is), no sign, no terminator. |
+<br>
+
+__How the line index is built from one buffer__ <br>
+`index_lines` fills the `struct line` with a list of {offset, length} pairs, one per line, in file order, that points into the original buffer. The buffer is never copied or modified, so `driver.c` can print any line from `buf + offset` for `length` bytes. A line’s length excludes its trailing newline, the last line still counts when the file has no trailing newline, and an empty file has zero lines.
+<br><br>
+
+__How the flag table dispatches__ <br>
+`parse_args` turns flag characters into bits, and the driver acts on these bits.
+
+`flag_chars db 'n','c','v','i','w'` is stored in bit order, so a character’s position in the table is its bit number:
+
+| Char | Table Index | `ecx` after `i` is hit | Bit Set in Flags |
+|---|---|---|---|
+| n | 0 | 4 | 1 |
+| c | 1 | 3 | 2 |
+| v | 2 | 2 | 4 |
+| i | 3 | 1 | 8 |
+| w | 4 | 0 | 16 |
+
+For each token found in the command line, if `parse_args` recognizes it as a flag group, it loops over each byte after the dash, loading it into `al`. It sets `edi = table` and `ecx = table length`. Then `repne scasb` scans the table, compares `al` with `[edi]`, advances `edi`, and decrements `ecx` until they match or `ecx` hits `0`. If there is no match, the character is an unknown flag, and `parse_args` returns it as a positive int. Otherwise, it reads the index where the flag matches (`4 - ecx` since `ecx` has already been decremented for the matching byte), and `or`s the bit into flags. 
+
+The addition of flags changes the flag table in the parser, the flag state, and the driver’s dispatch, two of which are in `driver.c` that cannot be modified. 
+
+`scasb` reads the direction flag the same way `cmpsb` does, so pointers advance at `0` (DF cleared by `cld`) and move backwards at `1` (DF set by `std`). `parse_args` runs `cld` at entry so it never depends on what ran before.
+<br><br>
+
+__Which registers each routine uses__ <br>
+All four routines follow the same `cdecl` rules as Lab 2, where arguments are on a stack starting at `[ebp+8]` and `eax` returns the value. `eax`, `ecx`, and `edx` are caller-saved registers, so a routine can overwrite them, while callee-saved registers (`ebx`, `esi`, `edi`, and `ebp`) must be preserved. Some routines, such as `parse_args`, use other views of registers (`al`, `ah`, `ax`).
+<br><br>
+
 ### Timeline
 
 One line per week. Name the subsystem each week finishes and the member
