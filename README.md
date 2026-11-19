@@ -84,6 +84,21 @@ Keep each part short. Update it when the plan changes.
 The five flags and what each one does. What the oracle is, and what
 agreement with it means for a line that matches inside a longer word.
 
+| Flags | Behavior |
+| --- | --- |
+| `-n` | Prefix each printed line with its 1-based line number and a `:`. |
+| `-c` | Print only the count of matched lines (non-matching lines if paired with `-v`).  Overrides all line output, so `-n -c` prints just the count. |
+| `-v` | Print the lines that do not match. |
+| `-i` | Match ignoring case, so uppercase and lowercase are treated as equal when comparing. Folding happens in registers, so the original line is printed. |
+| `-w` | Match only whole words. A match counts only if the characters right before and after it are not letters, digits, or `_` (or if there is no character there, such as at the start or end of a line). A failed check does not stop the search, which continues to the next position in the line. |
+
+**Oracle** 
+- a trusted reference program whose output defines what “correct” means, so a tool is tested by comparing against it rather than against expectation. Here, it’s `grep`, run as `LC_ALL=C grep -F`.
+	- `LC_ALL=C` keeps case folding identical on every machine, and `-F` makes the pattern a fixed string
+- `rengrep` must produce byte-identical output for the same arguments.
+- Agreement means a line like `concatenate` is printed for pattern `cat`, because the pattern is a literal substring. Only `-w` excludes it.
+
+
 ### Solution architecture
 
 How the four routines split the work. How the line index is built from
