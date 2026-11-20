@@ -98,21 +98,21 @@ _parse_args:
 .walk_args:
         cmp     edx, [ebp+8]            ; compare current argv index w/ total num of args
         jge     .finish
-        mov     eax, [ebp+12]           ; load current arg
-        mov     esi, [eax+edx*4]        ; check first char
+        mov     eax, [ebp+12]           ; load args
+        mov     esi, [eax+edx*4]        ; load current arg
         inc     edx
 
         cmp     byte [esi], '-'         ; compare 1st char with '-'
         jne     .positional
         cmp     byte [esi+1], 0         ; compare 2nd char with NUL ('\0')
         je      .positional
-        inc     esi                     ; go to next char
+        inc     esi                     ; go to next arg
 
 .scanning_shifting:
         movzx     eax, byte [esi]       ; if extended ASCII char is passed, zero-extend
         cmp       eax, 0
         je        .walk_args            ; if '\0' current argv token is fully parsed
-        inc       esi                   ;next character
+        inc       esi                   ; next arg
         mov       edi, flag_table       ; edi points to start of flag table
         mov       ecx, FLAG_COUNT       ; search until at most 5 chars
         repne     scasb
