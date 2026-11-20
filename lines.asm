@@ -66,7 +66,57 @@ _index_lines:
         ; writing at max.
         ;
 
-        popa
-        mov     eax, 0
+        mov     esi, [ebp+8]                    ; esi = buf
+        mov     ecx, [ebp+12]                   ; ecs = len
+        mov     edi, [ebp+16]                   ; edi = out
+        mov     edx, [ebp+20]                   ; edx = max
+
+        mov     eax, 0                          ; counter for entries (count) = 0
+        mov     ebx, 0                          ; current index (i) = 0
+        mov     dword [ebp-4], 0                ; starting index (start) = 0
+
+; continuously loop while i < len
+.walk_loop:
+        cmp     ebx, ecx                        ; if i >= len, done walking
+        jae     .trailing_newline              
+
+        cmp     eax, edx                        ; if count >= max, out is full
+        jae     .done_walk                     
+
+        cmp     byte [esi+ebx], 0x0A            ; if buf[ index] == 0x0A (\n) 
+        jne     .skip                          
+
+        mov     edx, [ebp-4]                    ; edx = start
+        mov     [edi], edx                      ; set offset as start
+        mov     edx, ebx                        ; edx = i
+        sub     edx, [ebp-4]                    ; edx = i - start
+        mov     [edi+4], edx                    ; length = i - start
+        add     edi, 8                          ; go to next entry
+        inc     eax                             ; increase entry counter
+        lea     edx, [ebx+1]                    ; edx = ebx + 1
+        mov     [ebp-4], edx                    ; new start
+        mov     edx, [ebp+20]                   ; reload max into edx
+
+; move to next byte
+.skip:
+        inc     ebx                             ; move i
+        jmp     .walk_loop
+
+; handle last entry with no trailing newline
+.trailing_newline:
+        cmp     eax, edx                        ; if count >= max, out is full
+        jae     .done_walk
+        mov     edx, [ebp-4]                    ; edx = start
+        cmp     edx, ecx                        ; if start >= len, no more leftover after /n
+        jae     .done_walk
+        mov     [edi], edx                      ; set offset as new start
+        sub     ecx, edx                        ; length = start - len
+        mov     [edi+4], ecx                    ; length stored
+        inc     eax                             ; icnrement entry counter
+
+; done walking
+.done_walk:
+        mov     [esp + 28], eax                 
+        popa;
         leave
         ret
