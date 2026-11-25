@@ -61,7 +61,7 @@ segment .text
 
 _int_to_dec:
         enter   0,0
-        pusha
+        pusha                           ; save all regs
 
         ;
         ; TODO: convert.
@@ -71,7 +71,34 @@ _int_to_dec:
         ; The pop loop writes one byte per digit to out[0..count-1].
         ;
 
+        mov     eax, [ebp+8]            ; eax = n (dividend)
+        mov     edi, [ebp+12]           ; edi = out (pointer)
+        mov     ebx, 10                 ; divisor
+        xor     ecx, ecx                ; ecx = 0 (digit count)
+
+; bottom-tested
+.digit_loop:
+        xor     edx, edx                ; clear edx
+        div     ebx                     ; edx:eax; eax = n/10, edx = n%10
+        add     dl, '0'                 ; remainder (0-9) to ASCII
+        push    edx                     ; push digit; the stack reverses the order
+        inc     ecx                     
+        cmp     eax, 0                  ; quotient = 0 means that was the last digit
+        jne     .digit_loop
+
+        mov     ebx, ecx                ; save digit count
+
+; pop the digits back; most significant digit comes off the stack first
+.pop_loop:
+        pop     edx                     ; dl = next digit, in the correct order
+        mov     [edi], dl               ; out[i] = digit
+        inc     edi                     ; advance pointer
+        dec     ecx
+        jnz    .pop_loop                ; loops until all digits popped
+
+        ; popa would overwrite eax, so write the count into the saved eax slot
+        mov     [esp+28], ebx           ; saved eax = digit count
+
         popa
-        mov     eax, 0
         leave
         ret
