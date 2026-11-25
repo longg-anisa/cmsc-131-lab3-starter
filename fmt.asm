@@ -76,29 +76,29 @@ _int_to_dec:
         mov     ebx, 10                 ; divisor
         xor     ecx, ecx                ; ecx = 0 (digit count)
 
-; bottom-tested
+; bottom-tested; loop runs once before the check, so n == 0 emits "0".
 .digit_loop:
         xor     edx, edx                ; clear edx
-        div     ebx                     ; edx:eax; eax = n/10, edx = n%10
+        div     ebx                     ; eax = n/10, edx = remainder
         add     dl, '0'                 ; remainder (0-9) to ASCII
         push    edx                     ; push digit; the stack reverses the order
         inc     ecx                     
         cmp     eax, 0                  ; quotient = 0 means that was the last digit
         jne     .digit_loop
 
-        mov     ebx, ecx                ; save digit count
+        mov     ebx, ecx                ; save digit count since ecx will be used in pop_loop
 
 ; pop the digits back; most significant digit comes off the stack first
 .pop_loop:
         pop     edx                     ; dl = next digit, in the correct order
         mov     [edi], dl               ; out[i] = digit
         inc     edi                     ; advance pointer
-        dec     ecx
-        jnz    .pop_loop                ; loops until all digits popped
+        dec     ecx                     ; sets ZF = 1 when ecx reaches 0
+        jnz     .pop_loop               ; loops until all digits popped (jump if ZF = 0)
 
         ; popa would overwrite eax, so write the count into the saved eax slot
         mov     [esp+28], ebx           ; saved eax = digit count
 
-        popa
+        popa                            ; restore all regs, eax = digit count.
         leave
         ret
