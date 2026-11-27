@@ -83,7 +83,131 @@ _line_matches:
         ; Both need cld first.
         ;
 
+        cld                             ; DF
+        mov     ebx, [ebp+12]           ; get linelen
+        sub     ebx, [ebp+20]           ; lineline - patlen, bounds
+        jl      .no_match               ; pat is longer than linelen
+
+        mov     edx, 0                  ; cleans edx = start = 0
+        
+        ; ebx = bounds, edx = 0
+.start:
+        cmp     edx, ebx                ; start - bounds
+        jg      .no_match               ; start > bounds, not valid 
+
+        mov     esi, [ebp+16]           ; get pat
+        mov     edi, [ebp+8]            ; get line
+        add     edi, edx                ; line + start
+        mov     ecx, [ebp+20]           ; get patlen
+
+        cmp     dword[ebp+24], 0        ; fold flag
+        jne     .fold                   ; jumps to .fold if fold != 0
+
+        ; fast path (fold == 0)
+        test    ecx, ecx                ; setting ZF = 1 when patlen == 0 (empty pattern)
+        repe    cmpsb                   ; [esi] [edi] comparison, advances pointers
+                                        ; stop when ZF = 0 (mismatch)
+        jne     .next                   ; mismatch (ZF = 0): next pos
+        jmp     .candidate              ; all bytes equal (ZF = 1)
+
+; case-insensitive
+.fold:
+        test    ecx, ecx                ; patlen == 0
+        jz      .candidate              ; empty pattern: match
+
+.fold_loop:
+        ; esi = next pat byte, edi = next line byte, ecx = bytes left to compare
+        lodsb                           ; loads pat byte to al, advances esi
+        mov     ah, [edi]               ; gets line byte 
+        inc     edi                     ; next line byte
+
+        cmp     al, 'A'                 ; fold
+        jb      .not_upper
+        cmp     al, 'Z'
+        ja      .not_upper
+        add     al, 32                  ; 'a' - 'A' = 32
+
+.not_upper:
+        cmp     ah, 'A'                 ; fold
+        jb      .upper
+        cmp     ah, 'Z'
+        ja      .upper
+        add     ah, 32                  ; 'a' - 'A' = 32
+
+.upper:
+        ; al = folded pat byte, ah = folded line byte
+        cmp     al, ah
+        jne     .next                   ; mismatch
+
+        dec     ecx                     ; bytes left to comp
+        jnz     .fold_loop              ; loop back when ecx != 0
+
+        jmp     .candidate              ; bytes match 
+
+        ; pat match
+.candidate:
+        cmp     dword[ebp+28], 0        ; whole flag
+        je      .match                  ; jumps to match if does not require whole word matching
+
+        ; left check
+        test    edx, edx                ; start 0
+        jz      .check
+        mov     esi, [ebp+8]            ; get line
+        mov     al, [esi+edx-1]         ; line[start-1]
+
+        cmp     al, '0'                 ; below 0
+        jb      .check
+        cmp     al, '9'                 ; 0-9
+        jbe     .next
+        cmp     al, 'A'                 ; 9-A, symbols
+        jb      .check
+        cmp     al, 'Z'                 ; A-Z
+        jbe     .next
+        cmp     al, '_'                 ; _
+        je      .next
+        cmp     al, 'a'                 ; Z-a, not _, parentheses, brackets, etc.
+        jb      .check
+        cmp     al, 'z'                 ; a-z
+        jbe     .next
+
+        ; right check
+.check:
+        mov     eax, edx                ; start
+        add     eax, [ebp+20]           ; start + patlen
+        cmp     eax, [ebp+12]           ; linelen comp to start + patlen
+        je      .match                  ; end of line
+        mov     esi, [ebp+8]
+        mov     al, [esi+eax]           ; line[start+patlen]
+        
+        cmp     al, '0'                 ; below 0
+        jb      .match
+        cmp     al, '9'                 ; 0-9
+        jbe     .next
+        cmp     al, 'A'                 ; 9-A, symbols
+        jb      .match
+        cmp     al, 'Z'                 ; A-Z
+        jbe     .next
+        cmp     al, '_'                 ; _
+        je      .next
+        cmp     al, 'a'                 ; Z-a, not _, parentheses, brackets, etc.
+        jb      .match
+        cmp     al, 'z'                 ; a-z
+        jbe     .next
+
+        jmp     .match
+
+.next:
+        inc     edx                     ; increments start
+        jmp     .start                  ; loop back
+
+.match:
         popa
-        mov     eax, 0
+        mov     eax, 1                  ; found match
+        leave
+        ret
+
+.no_match:
+        popa
+        mov     eax, 0                  ; no match
         leave
         ret
